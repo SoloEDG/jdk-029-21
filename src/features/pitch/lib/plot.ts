@@ -2,13 +2,14 @@ import type { GuideNote, PitchPoint, TimeRange } from '../../../shared/document'
 import { clockLabel } from '../../../shared/time'
 import { noteName } from './detect'
 
-interface Trace { points: PitchPoint[]; color: string }
+interface Trace { points: PitchPoint[]; color: string; label?: string }
 
 interface Plot {
   position: number
   range: TimeRange
   notes: GuideNote[]
   traces: Trace[]
+  gaps?: TimeRange[]
 }
 
 export function drawPitch(canvas: HTMLCanvasElement, width: number, height: number, plot: Plot) {
@@ -70,6 +71,20 @@ export function drawPitch(canvas: HTMLCanvasElement, width: number, height: numb
     context.beginPath()
     context.roundRect(start, y(note.midi) - 4, length, 8, 4)
     context.fill()
+  }
+  for (const gap of plot.gaps ?? []) {
+    if (gap.end <= plot.range.start || gap.start >= plot.range.end) continue
+    const gx = x(Math.max(gap.start, plot.range.start))
+    const gw = x(Math.min(gap.end, plot.range.end)) - gx
+    context.fillStyle = 'rgba(240, 153, 130, 0.16)'
+    context.fillRect(gx, top, Math.max(2, gw), bottom - top)
+    context.strokeStyle = 'rgba(240, 153, 130, 0.55)'
+    context.setLineDash([4, 4])
+    context.beginPath()
+    context.moveTo(gx, top)
+    context.lineTo(gx, bottom)
+    context.stroke()
+    context.setLineDash([])
   }
   for (const trace of plot.traces) {
     context.strokeStyle = trace.color

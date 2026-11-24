@@ -1,23 +1,24 @@
 import { onBeforeUnmount, ref } from 'vue'
 import type { PcmFrame, TimeRange } from '../../../shared/document'
 import { openInput } from '../lib/input'
-import { toWave } from '../lib/wave'
 
-interface CaptureTarget {
+export interface CaptureTarget {
   songId: string
   lineId: string
   range: TimeRange
 }
 
-interface CapturedAudio extends TimeRange {
-  audio: Blob
+export interface CapturedPcm extends TimeRange {
   songId: string
   lineId: string
+  frames: PcmFrame[]
+  inputStart: number
+  sampleRate: number
 }
 
 interface CaptureEvents {
   onFrame: (time: number, samples: Float32Array, rate: number) => void
-  onComplete: (result: CapturedAudio) => Promise<void>
+  onComplete: (result: CapturedPcm) => Promise<void>
   position: () => number
 }
 
@@ -95,10 +96,17 @@ export function useCapture(events: CaptureEvents) {
         issue.value = '录音少于 0.2 秒，未保存。'
         return
       }
-      const audio = toWave(recording.frames, recording.inputStart, duration, stream.sampleRate)
-      await events.onComplete({ audio, start: recording.songStart, end, songId: recording.songId, lineId: recording.lineId })
+      await events.onComplete({
+        start: recording.songStart,
+        end,
+        songId: recording.songId,
+        lineId: recording.lineId,
+        frames: recording.frames,
+        inputStart: recording.inputStart,
+        sampleRate: stream.sampleRate,
+      })
     } catch {
-      issue.value = '录音未能保存。'
+      issue.value = '录音未能处理。'
     } finally {
       stream.close()
       if (input === stream) input = null

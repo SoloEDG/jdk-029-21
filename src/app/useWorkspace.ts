@@ -1,10 +1,12 @@
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { songs, useTransport } from '../features/playback'
 import { useLyrics } from '../features/lyrics'
 import { useCapture } from '../features/capture'
 import { usePitch } from '../features/pitch'
-import { useReview } from '../features/review'
-import type { Song, Take } from '../shared/document'
+import { useDraft } from '../features/draft'
+import { framesToPcm, pcmToWave } from '../features/draft'
+import type { SegmentChoice, Song } from '../shared/document'
+import type { Candidate } from '../features/draft'
 
 export function useWorkspace() {
   const transport = useTransport(songs[0], {
@@ -12,26 +14,50 @@ export function useWorkspace() {
   })
   const lyrics = useLyrics(transport.song, transport.position)
   const pitch = usePitch()
-  const review = useReview(transport.song, lyrics.selected, () => {
+  const draft = useDraft(transport.song, lyrics.selected, () => {
     capture.cancelRequest()
     transport.pause()
   })
+  const choices = reactive<Record<string, { start: number; end: number; choice: SegmentChoice }[]>>({})
+  const pendingChoiceFor = ref<string | null>(null)
   const capture = useCapture({
     onFrame: pitch.receive,
     position: transport.read,
     onComplete: async result => {
-      await review.save({
-        ...result, id: crypto.randomUUID(), createdAt: Date.now(), pitch: pitch.slice(result),
-      })
+      const duration = result.end - result.start
+      const pcm = framesToPcm(result.frames, result.inputStart, duration, result.sampleRate)
+      const candidate: Omit<Candidate, 'persisted'> = {
+        id: crypto.randomUUID(),
+        songId: result.songId,
+        lineId: result.lineId,
+        start: result.start,
+        end: result.end,
+        createdAt: Date.now(),
+        pcm,
+        audio: pcmToWave(pcm, result.sampleRate),
+        sampleRate: result.sampleRate,
+        pitch: pitch.slice({ start: result.start, end: result.end }),
+      }
+      const full = await draft.addCandidate(candidate)
+      choices[full.id] = draft.defaultChoices(full)
+      pendingChoiceFor.value = full.id
     },
   })
+
   const graphRange = computed(() => {
-    if (review.position.value !== null || !transport.isPlaying.value || capture.status.value === 'recording') {
+    if (draft.replayState.value !== null || !transport.isPlaying.value || capture.status.value === 'recording') {
       return lyrics.selected.value ?? { start: 0, end: transport.song.value.duration }
     }
     return lyrics.active.value ?? lyrics.upcoming.value ?? lyrics.selected.value!
   })
-  const graphPosition = computed(() => review.position.value ?? transport.position.value)
+  const graphPosition = computed(() => {
+    const state = draft.replayState.value
+    if (state) return state.item.start
+    return transport.position.value
+  })
+  const graphGaps = computed(() => draft.timeline.value.gaps)
+  const pitchReady = computed(() =>
+    (draft.draft.value?.segments ?? []).every(segment => !segment.pitchMissing))
 
   function finishCapture(position: number): void { void capture.stop(position) }
 
@@ -39,7 +65,7 @@ export function useWorkspace() {
     const line = lyrics.select(id)
     if (!line) return
     capture.cancelRequest()
-    review.stop()
+    draft.stopReplay()
     if (transport.loop.value) transport.loop.value = line
     transport.seek(line.start)
   }
@@ -49,17 +75,17 @@ export function useWorkspace() {
     if (line) selectLine(line.id)
   }
 
-  function selectSong(song: Song) {
-    if (song.id === transport.song.value.id) return
+  function selectSong(next: Song) {
+    if (next.id === transport.song.value.id) return
     capture.cancelRequest()
-    review.stop()
-    transport.setSong(song)
+    draft.stopReplay()
+    transport.setSong(next)
     lyrics.reset()
   }
 
   function seek(position: number) {
     capture.cancelRequest()
-    review.stop()
+    draft.stopReplay()
     const loop = transport.loop.value
     if (loop && (position < loop.start || position >= loop.end)) transport.loop.value = null
     transport.seek(position)
@@ -78,7 +104,7 @@ export function useWorkspace() {
 
   function togglePlay() {
     capture.cancelRequest()
-    review.stop()
+    draft.stopReplay()
     if (transport.isPlaying.value) transport.pause()
     else void transport.play()
   }
@@ -94,16 +120,42 @@ export function useWorkspace() {
     }
     const line = lyrics.selected.value
     if (!line || capture.status.value !== 'idle') return
-    review.stop()
+    draft.stopReplay()
     transport.pause()
     pitch.clear()
-    void capture.start({ songId: transport.song.value.id, lineId: line.id, range: line }, () => {
-      transport.seek(line.start)
+    // 从已保存的一字之前重唱：起点取当前播放位置（可在任意已确认段之前），范围仍是本句
+    void capture.start({ songId: transport.song.value.id, lineId: line.id, range: line }, async () => {
+      const start = Math.max(line.start, Math.min(transport.read(), line.end - 0.2))
+      transport.seek(start)
       return transport.play()
     })
   }
 
-  function listen(take: Take) { void review.listen(take) }
+  function setChoice(candidateId: string, entry: { start: number; end: number; choice: SegmentChoice }) {
+    const list = choices[candidateId]
+    if (!list) return
+    const index = list.findIndex(item => item.start === entry.start && item.end === entry.end)
+    if (index >= 0) list[index] = { ...entry }
+  }
+
+  async function confirmCandidate(candidate: Candidate) {
+    const list = choices[candidate.id]
+    if (!list) return
+    const ok = await draft.confirm(candidate, list)
+    if (ok) {
+      delete choices[candidate.id]
+      pendingChoiceFor.value = null
+    }
+  }
+
+  function lockSegment(range: { start: number; end: number }) {
+    draft.toggleLock(range)
+  }
+
+  function rebuildPitch(candidateId?: string) {
+    void draft.rebuildPitch(candidateId)
+    void draft.rebuildDraftPitch()
+  }
 
   watch(transport.position, position => {
     const line = lyrics.selected.value
@@ -119,7 +171,8 @@ export function useWorkspace() {
   onBeforeUnmount(() => document.removeEventListener('visibilitychange', handleVisibility))
 
   return {
-    transport, lyrics, pitch, review, capture, graphRange, graphPosition,
-    selectLine, adjacent, selectSong, seek, toggleLoop, togglePlay, toggleRecording, listen,
+    transport, lyrics, pitch, draft, capture, choices, graphRange, graphPosition, graphGaps, pitchReady,
+    selectLine, adjacent, selectSong, seek, toggleLoop, togglePlay, toggleRecording,
+    setChoice, confirmCandidate, lockSegment, rebuildPitch,
   }
 }

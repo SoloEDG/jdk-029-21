@@ -115,6 +115,11 @@ svg { flex-shrink: 0; }
 .legend.live { background: var(--green); }
 .legend.a { background: #85cbd5; }
 .legend.b { background: #ec9fa9; }
+.legend.gap {
+  background: repeating-linear-gradient(45deg, var(--coral) 0 3px, transparent 3px 6px);
+  width: 12px; height: 8px; border-radius: 2px;
+}
+.pitch-pending { color: var(--gold); }
 .pitch-canvas { display: block; width: 100%; height: 214px; }
 .pitch-footer {
   display: flex; justify-content: space-between; gap: 12px; padding: 8px 16px 9px;
@@ -166,6 +171,7 @@ input[type=range]::-moz-range-thumb { border: none; background: var(--gold); wid
 .record-button { background: var(--coral); color: #2c1b16; border-color: transparent; font-weight: 700; }
 .record-button:hover { background: #ffad98; }
 .record-button.recording { background: #402a24; color: #ffb099; border-color: #985a4c; }
+.record-hint { flex-basis: 100%; color: var(--soft); font-size: 11px; margin-top: 2px; }
 .inline-error { flex-basis: 100%; color: #ffac98; font-size: 12px; margin-top: 4px; }
 
 .review-line { border-top: 1px solid var(--rule); color: var(--gold); padding-top: 11px; font-size: 13px; }
@@ -191,6 +197,55 @@ input[type=range]::-moz-range-thumb { border: none; background: var(--gold); wid
 }
 .slot-a { color: #85cbd5; }
 .slot-b { color: #ec9fa9; }
+
+.draft-panel .review-line { margin-bottom: 10px; }
+.timeline-strip {
+  display: flex; gap: 2px; min-height: 22px; align-items: stretch;
+  border: 1px solid var(--rule); border-radius: 5px; padding: 4px; background: var(--inset);
+}
+.timeline-seg { flex: 1 1 0; min-width: 6px; background: #85cbd5; border-radius: 2px; }
+.timeline-seg.locked { background: var(--gold); box-shadow: inset 0 0 0 1px #8b7041; }
+.timeline-gap {
+  flex: 1 1 0; min-width: 6px; border-radius: 2px;
+  background: repeating-linear-gradient(45deg, #6a443c 0 4px, transparent 4px 8px);
+}
+.timeline-empty { margin: auto; color: var(--muted); font-size: 11px; }
+.replay-row { display: flex; gap: 8px; margin: 10px 0 6px; flex-wrap: wrap; }
+.replay-row .loop-button { min-height: 34px; font-size: 11px; padding: 0 10px; }
+.replay-hint { color: var(--gold); font-size: 11px; margin-bottom: 8px; }
+.lock-row { display: grid; gap: 6px; margin: 8px 0 12px; }
+.lock-segments { display: flex; gap: 6px; flex-wrap: wrap; }
+.lock-chip {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 28px;
+  border: 1px solid var(--rule); border-radius: 4px; background: var(--inset);
+  color: var(--muted); font-size: 10px; padding: 0 8px;
+}
+.lock-chip.on { border-color: #8b7041; background: #3b3221; color: var(--gold); }
+.candidate-list { max-height: none; }
+.candidate-card {
+  border: 1px solid var(--rule); border-radius: 6px; padding: 9px; margin-bottom: 10px;
+  background: var(--inset); display: grid; gap: 8px;
+}
+.candidate-card header { display: flex; align-items: center; gap: 8px; }
+.candidate-card footer { display: flex; align-items: center; gap: 8px; }
+.confirm-button { flex: 1; min-height: 36px; color: #241e12; background: var(--gold); border-color: transparent; font-weight: 700; }
+.confirm-button:hover { background: #fad48d; }
+.memory-badge {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  color: var(--coral); border: 1px solid #6a443c; border-radius: 4px;
+  font-size: 10px; padding: 3px 6px; white-space: nowrap;
+}
+.choice-list { display: grid; gap: 5px; border-top: 1px solid var(--rule); padding-top: 8px; }
+.choice-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.choice-time { color: var(--soft); font-size: 10px; }
+.choice-buttons { display: flex; gap: 4px; }
+.choice-chip {
+  min-height: 28px; border: 1px solid var(--rule); border-radius: 4px;
+  background: #272b22; color: var(--muted); font-size: 10px; padding: 0 8px;
+}
+.choice-chip.active { border-color: var(--gold); color: var(--gold); background: #3b3221; }
+.choice-chip:disabled { opacity: .45; }
+.inline-notice { color: var(--gold); font-size: 11px; margin-top: 6px; }
 
 @media (min-width: 1600px) {
   .workspace { grid-template-columns: 235px minmax(0, 1fr) 245px; }

@@ -4,12 +4,13 @@ import { songs, SongCatalog, SongHeading, TransportBar } from '../features/playb
 import { LyricStage, PhraseList } from '../features/lyrics'
 import { RecordControls } from '../features/capture'
 import { PitchPanel } from '../features/pitch'
-import { ReviewPanel } from '../features/review'
+import { DraftPanel } from '../features/draft'
 import { useWorkspace } from './useWorkspace'
 
 const {
-  transport, lyrics, pitch, review, capture, graphRange, graphPosition,
-  selectLine, adjacent, selectSong, seek, toggleLoop, togglePlay, toggleRecording, listen,
+  transport, lyrics, pitch, draft, capture, choices, graphRange, graphPosition, graphGaps, pitchReady,
+  selectLine, adjacent, selectSong, seek, toggleLoop, togglePlay, toggleRecording,
+  setChoice, confirmCandidate, lockSegment, rebuildPitch,
 } = useWorkspace()
 </script>
 
@@ -32,18 +33,22 @@ const {
       <PitchPanel :notes="transport.song.value.notes" :position="graphPosition" :range="graphRange"
         :latest="capture.status.value === 'recording' ? pitch.latest.value : null"
         :live="capture.status.value === 'recording' ? pitch.points.value : []"
-        :take-a="review.slots.value[0]?.pitch ?? []" :take-b="review.slots.value[1]?.pitch ?? []" />
+        :saved="draft.storedPitch.value" :gaps="graphGaps" :pitch-ready="pitchReady" />
       <TransportBar :song="transport.song.value" :position="transport.position.value" :playing="transport.isPlaying.value"
         :loop="transport.loop.value" :volume="transport.volume.value" :issue="transport.issue.value"
         @toggle="togglePlay" @previous="adjacent(-1)" @next="adjacent(1)" @loop="toggleLoop"
         @seek="seek" @volume="transport.setVolume" />
       <RecordControls :status="capture.status.value" :issue="capture.issue.value" :level="capture.level.value"
-        :selected="lyrics.selected.value" @toggle="toggleRecording" />
+        :selected="lyrics.selected.value" :has-draft="!!draft.draft.value?.segments.length" @toggle="toggleRecording" />
     </div>
     <aside class="right-rail">
-      <ReviewPanel :takes="review.visible.value" :slots="review.slots.value" :active-id="review.playingId.value"
-        :selected="lyrics.selected.value" :notes="transport.song.value.notes" :issue="review.issue.value"
-        @listen="listen" @choose="review.choose" />
+      <DraftPanel :line="lyrics.selected.value" :candidates="draft.visibleCandidates.value"
+        :memory-only-ids="draft.memoryOnlyCandidates.value.map(item => item.id)"
+        :replay-items="draft.replayItems.value" :replay-state="draft.replayState.value"
+        :choices="choices" :issue="draft.issue.value" :notice="draft.notice.value"
+        @preview="draft.previewCandidate" @discard="draft.discardCandidate"
+        @confirm="confirmCandidate" @replay="draft.replay" @stop-replay="draft.stopReplay"
+        @lock="lockSegment" @rebuild="rebuildPitch" @choice="setChoice" />
     </aside>
   </main>
 </template>

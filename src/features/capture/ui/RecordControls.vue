@@ -7,6 +7,7 @@ defineProps<{
   issue: string
   level: number
   selected: LyricLine | null
+  hasDraft: boolean
 }>()
 const emit = defineEmits<{ toggle: [] }>()
 </script>
@@ -26,8 +27,9 @@ const emit = defineEmits<{ toggle: [] }>()
     <button class="record-button" :class="{ recording: status === 'recording' }"
       :disabled="status === 'saving' || !selected" @click="emit('toggle')">
       <Square v-if="status === 'recording'" :size="15" fill="currentColor" /><Mic v-else :size="16" />
-      {{ status === 'recording' ? '停止录音' : status === 'requesting' ? '取消录音' : '录制这一句' }}
+      {{ status === 'recording' ? '停止录音' : status === 'requesting' ? '取消录音' : hasDraft ? '从当前位置重唱' : '录制这一句' }}
     </button>
+    <p class="record-hint">把进度条停在想重唱的字之前再录，录完在右侧逐段选择用新声还是留旧声。</p>
     <p v-if="issue" role="alert" class="inline-error">{{ issue }}</p>
   </section>
 </template>

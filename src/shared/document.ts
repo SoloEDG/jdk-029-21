@@ -38,3 +38,5 @@ export interface PcmFrame {
   inputTime: number
   samples: Float32Array
 }
+
+export type SegmentChoice = 'keep-old' | 'use-candidate' | 'abandon'
